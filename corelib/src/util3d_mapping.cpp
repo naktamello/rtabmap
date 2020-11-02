@@ -40,7 +40,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <pcl/common/common.h>
 #include <pcl/common/centroid.h>
 #include <pcl/common/io.h>
-
 namespace rtabmap
 {
 
@@ -106,13 +105,17 @@ void occupancy2DFromLaserScan(
 	float xMin, yMin;
 	cv::Mat map8S = create2DMap(poses, scans, viewpoints, cellSize, unknownSpaceFilled, xMin, yMin, 0.0f, scanMaxRange);
 
-	// find empty cells
+	// extract empty & occupied cell indices
 	std::list<int> emptyIndices;
+	std::list<int> occupiedIndices;
 	for(unsigned int i=0; i< map8S.total(); ++i)
 	{
 		if(map8S.data[i] == 0)
 		{
 			emptyIndices.push_back(i);
+		}
+		else if (map8S.data[i] == 100){
+			occupiedIndices.push_back(i);
 		}
 	}
 
@@ -132,15 +135,20 @@ void occupancy2DFromLaserScan(
 			++i;
 		}
 	}
-
-	// copy directly obstacles precise positions
-	if(scanMaxRange > cellSize)
+	occupied = cv::Mat();
+	if(occupiedIndices.size())
 	{
-		occupied = util3d::rangeFiltering(LaserScan::backwardCompatibility(scanHit), 0.0f, scanMaxRange).data().clone();
-	}
-	else
-	{
-		occupied = scanHit.clone();
+		occupied = cv::Mat(1, (int)occupiedIndices.size(), CV_32FC2);
+		int i = 0;
+		for(std::list<int>::iterator iter=occupiedIndices.begin();iter!=occupiedIndices.end(); ++iter)
+		{
+			int y = *iter / map8S.cols;
+			int x = *iter - y*map8S.cols;
+			cv::Vec2f * ptr = occupied.ptr<cv::Vec2f>();
+			ptr[i][0] = (float(x))*cellSize + xMin;
+			ptr[i][1] = (float(y))*cellSize + yMin;
+			++i;
+		}
 	}
 }
 
